@@ -7,6 +7,7 @@ import {
   type TaskRecord,
 } from "./lib/state.ts";
 import { reconcileOpenTasks } from "./lib/reconcile.ts";
+import { resolvePendingIncidentsToApprovals } from "./lib/incidents.ts";
 
 const DEFAULT_WORKSPACE_DIR = "/root/.openclaw/workspace";
 const DEFAULT_STALE_MS = 60_000;
@@ -130,7 +131,11 @@ async function onOutbound(event: any) {
 async function onStartup(event: any) {
   const workspaceDir = getWorkspaceDir(event);
   const result = await runReconcile(workspaceDir);
+  const incidentApprovals = await resolvePendingIncidentsToApprovals(workspaceDir);
   console.log(`[task-guard] startup reconcile ${JSON.stringify(result)}`);
+  if (incidentApprovals.length > 0) {
+    console.log(`[task-guard] startup incident approvals ${JSON.stringify(incidentApprovals)}`);
+  }
 }
 
 export default async function handler(event: any) {
