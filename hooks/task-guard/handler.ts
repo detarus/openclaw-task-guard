@@ -6,6 +6,7 @@ import {
   setOpenTaskForSession,
   type TaskRecord,
 } from "./lib/state.ts";
+import { reconcileOpenTasks } from "./lib/reconcile.ts";
 
 function nowIso() {
   return new Date().toISOString();
@@ -103,9 +104,13 @@ async function onOutbound(event: any) {
   console.log(`[task-guard] closed task=${task.taskId} session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
 }
 
-async function onStartup(_event: any) {
-  // Phase 2 scaffold only. Reconciliation logic will be added in the next task.
-  return;
+async function onStartup(event: any) {
+  const workspaceDir = getWorkspaceDir(event);
+  const result = await reconcileOpenTasks(workspaceDir, {
+    dryRun: false,
+    staleMs: 60_000,
+  });
+  console.log(`[task-guard] startup reconcile ${JSON.stringify(result)}`);
 }
 
 export default async function handler(event: any) {
