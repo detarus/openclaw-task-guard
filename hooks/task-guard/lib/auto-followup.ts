@@ -20,7 +20,7 @@ const RULES: Record<KnownIncidentType, FollowupRule> = {
   "gateway-restart-interrupt": {
     incidentType: "gateway-restart-interrupt",
     verifyCommand: "openclaw gateway status",
-    followupTemplate: "Похоже, прошлый шаг мог оборваться на рестарте. Перепроверил: gateway уже поднялся, продолжаю.",
+    followupTemplate: "Похоже, прошлый шаг мог оборваться на рестарте. Перепроверил: gateway уже поднялся, task-guard снова загрузился, startup reconcile отработал. Продолжаю с текущего места.",
     maxAttempts: 1,
   },
   "browser-start-interrupt": {

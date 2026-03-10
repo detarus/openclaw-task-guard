@@ -32,6 +32,7 @@ This repository already contains a usable first operator-driven version:
 - approval preview flow
 - approval confirm-and-close flow
 - real delivery bridge validated with Telegram via OpenClaw `message.send`
+- incident-based startup follow-up preparation for known restart interruption scenarios
 - companion skill: `task-closure-guard`
 
 ## Architecture

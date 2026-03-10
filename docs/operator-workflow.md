@@ -8,7 +8,7 @@ This project is intentionally designed so recovery sends can be previewed and ap
 
 ## Recommended mode
 
-Use **manual approved recovery mode**.
+Use **manual approved recovery mode** as the default.
 
 That means:
 - detect automatically
@@ -16,6 +16,18 @@ That means:
 - preview manually
 - confirm manually
 - send manually through a trusted message path
+
+### Exception: safe startup follow-ups
+
+A very narrow class of known incidents can prepare a startup follow-up automatically after restart, for example:
+- `gateway-restart-interrupt`
+
+For these cases the preferred message should include both:
+- recovery acknowledgement
+- current resume status
+
+Example:
+- "Похоже, прошлый шаг мог оборваться на рестарте. Перепроверил: gateway уже поднялся, task-guard снова загрузился, startup reconcile отработал. Продолжаю с текущего места."
 
 ## Workflow
 
