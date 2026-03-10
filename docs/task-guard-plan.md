@@ -30,8 +30,8 @@ Use a **three-layer design**:
    - Teach the agent to explicitly close tasks after risky or multi-step work.
    - Reduce the number of orphaned tasks in the first place.
 
-Completion should be considered **confirmed only after an outbound message is actually sent**.
-The strongest signal available is the `message:sent` hook event.
+Completion should be considered **strongly confirmed** after an outbound message is actually sent.
+The strongest signal available is the `message:sent` hook event, but in practice it must be treated as a **best-effort strong signal**, not the only closure mechanism, because some outbound reply paths may skip the internal `message:sent` hook when no `sessionKeyForInternalHooks` is available.
 
 ---
 
@@ -219,6 +219,7 @@ Primary phases:
 - `received`
 - `working`
 - `awaiting_reply`
+- `awaiting_confirmation`
 - `reply_sent`
 - `recovery_pending`
 - `recovered`
@@ -321,12 +322,15 @@ Order from safest to most aggressive:
 
 1. mark `recovery_pending`
 2. append structured note to task file
-3. on next user interaction, force a reconciliation summary
-4. optional automatic fallback outbound message:
+3. if a reply appears to have been generated but `message:sent` was never observed, move task to `awaiting_confirmation` instead of assuming hard failure
+4. on next user interaction, force a reconciliation summary
+5. optional automatic fallback outbound message:
    - “Похоже, прошлый шаг мог оборваться. Короткий итог: …”
 
 For MVP, prefer **conservative recovery**:
 - detect and mark first
+- treat `message:sent` as strong confirmation when present
+- allow a fallback `awaiting_confirmation` state when outbound hook confirmation is missing
 - auto-send only in clearly tool-heavy sessions or after restart interruption patterns
 
 ---
