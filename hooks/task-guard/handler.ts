@@ -24,8 +24,12 @@ function getInboundText(event: any): string {
   );
 }
 
-function getWorkspaceDir(event: any): string | undefined {
-  return event?.context?.workspaceDir || event?.context?.sessionEntry?.workspaceDir;
+function getWorkspaceDir(event: any): string {
+  return (
+    event?.context?.workspaceDir ||
+    event?.context?.sessionEntry?.workspaceDir ||
+    "/root/.openclaw/workspace"
+  );
 }
 
 async function onInbound(event: any) {
