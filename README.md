@@ -115,6 +115,8 @@ Responsibilities:
 See:
 - `docs/state-machine.md` — lifecycle states and transitions
 - `docs/operator-workflow.md` — practical operator workflow for preview / approve / confirm recovery sends
+- `docs/example-operator-session.md` — minimal end-to-end operator example
+- `docs/known-limitations.md` — current constraints and intentional guardrails
 - `docs/task-guard-plan.md` — architecture and implementation notes
 
 ## Operator workflow
@@ -168,3 +170,12 @@ That means:
 - preview recovery candidates
 - require explicit approval before recovery delivery
 - avoid auto-send until confidence and guardrails are stronger
+
+## Real-world testing checklist
+
+Before testing in a live chat:
+- ensure the `task-guard` hook is enabled
+- restart the OpenClaw gateway so the latest hook code is loaded
+- verify `state/task-guard/` is writable in the workspace
+- trigger a normal inbound message and confirm a task file is created
+- simulate a stale/recovery case before trying a real approved recovery send
