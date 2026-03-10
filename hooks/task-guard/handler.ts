@@ -15,13 +15,22 @@ function getSessionKey(event: any): string | undefined {
   return event?.sessionKey || event?.context?.sessionKey;
 }
 
+function getInboundText(event: any): string {
+  return (
+    event?.context?.bodyForAgent ||
+    event?.context?.body ||
+    event?.context?.content ||
+    ""
+  );
+}
+
 async function onInbound(event: any) {
   const sessionKey = getSessionKey(event);
   if (!sessionKey) return;
 
   const existing = await getOpenTaskForSession(sessionKey);
   const now = nowIso();
-  const content = event?.context?.content || "";
+  const content = getInboundText(event);
 
   if (existing) {
     existing.updatedAt = now;
@@ -34,7 +43,7 @@ async function onInbound(event: any) {
   const task: TaskRecord = {
     taskId: makeTaskId(),
     sessionKey,
-    agentId: event?.context?.sessionEntry?.agentId,
+    agentId: event?.context?.sessionEntry?.agentId || event?.agentId,
     channel: event?.context?.channelId,
     conversationId: event?.context?.conversationId,
     messageId: event?.context?.messageId,
