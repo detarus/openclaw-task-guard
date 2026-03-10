@@ -45,6 +45,33 @@ export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: num
       if (!dryRun) {
         task.phase = "awaiting_confirmation";
         task.updatedAt = now;
+        task.recovery = {
+          needed: true,
+          attemptedAt: task.recovery?.attemptedAt ?? null,
+          attemptCount: task.recovery?.attemptCount ?? 0,
+        };
+        await saveTask(task, baseDir);
+        result.updated += 1;
+      }
+      continue;
+    }
+
+    if (task.phase === "awaiting_confirmation" && taskAge >= staleMs * 3) {
+      result.candidates.push({
+        taskId,
+        sessionKey,
+        fromPhase: task.phase,
+        toPhase: "recovery_pending",
+        reason: `awaiting-confirmation>${staleMs * 3}ms`,
+      });
+      if (!dryRun) {
+        task.phase = "recovery_pending";
+        task.updatedAt = now;
+        task.recovery = {
+          needed: true,
+          attemptedAt: task.recovery?.attemptedAt ?? null,
+          attemptCount: task.recovery?.attemptCount ?? 0,
+        };
         await saveTask(task, baseDir);
         result.updated += 1;
       }

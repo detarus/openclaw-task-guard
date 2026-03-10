@@ -7,6 +7,7 @@ export type TaskPhase =
   | "received"
   | "working"
   | "awaiting_reply"
+  | "awaiting_confirmation"
   | "reply_sent"
   | "recovery_pending"
   | "recovered";
