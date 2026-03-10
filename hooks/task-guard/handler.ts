@@ -105,17 +105,34 @@ async function onStartup(_event: any) {
 }
 
 export default async function handler(event: any) {
-  if (event?.type === "message" && event?.action === "preprocessed") {
-    await onInbound(event);
-    return;
-  }
+  try {
+    const summary = {
+      type: event?.type,
+      action: event?.action,
+      sessionKey: event?.sessionKey,
+      hasContext: !!event?.context,
+      contextKeys: event?.context ? Object.keys(event.context) : [],
+      channelId: event?.context?.channelId,
+      conversationId: event?.context?.conversationId,
+      messageId: event?.context?.messageId,
+      workspaceDir: getWorkspaceDir(event),
+    };
+    console.log(`[task-guard] event ${JSON.stringify(summary)}`);
 
-  if (event?.type === "message" && event?.action === "sent") {
-    await onOutbound(event);
-    return;
-  }
+    if (event?.type === "message" && event?.action === "preprocessed") {
+      await onInbound(event);
+      return;
+    }
 
-  if (event?.type === "gateway" && event?.action === "startup") {
-    await onStartup(event);
+    if (event?.type === "message" && event?.action === "sent") {
+      await onOutbound(event);
+      return;
+    }
+
+    if (event?.type === "gateway" && event?.action === "startup") {
+      await onStartup(event);
+    }
+  } catch (error: any) {
+    console.error(`[task-guard] handler error: ${error?.stack || error?.message || error}`);
   }
 }
