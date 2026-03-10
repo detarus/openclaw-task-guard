@@ -5,7 +5,7 @@ import {
   saveTask,
   setOpenTaskForSession,
   type TaskRecord,
-} from "./lib/state.js";
+} from "./lib/state.ts";
 
 function nowIso() {
   return new Date().toISOString();
