@@ -1,67 +1,170 @@
 # openclaw-task-guard
 
-Fixes interrupted OpenClaw runs and missing final task updates in Telegram, WhatsApp, and Discord with task journaling, watchdog recovery, and reliable closure patterns.
+Fixes a common OpenClaw reliability problem where Telegram, WhatsApp, or Discord users do not receive the final status of a completed task, or the agent gets interrupted mid-run and never sends the closing update.
 
-## Problem
+`openclaw-task-guard` adds a durable task journal, reconciliation logic, recovery approval flow, and a companion closure skill so interrupted work can be detected and recovered safely.
 
-OpenClaw can successfully do work but still fail to deliver the final user-facing status update.
+## What problem this solves
 
-Common failure modes:
+OpenClaw can successfully do real work and still fail to deliver the final user-facing status update.
 
-- a shell command is interrupted by `gateway restart`
+Typical failure modes:
+
+- a shell command is interrupted by `openclaw gateway restart`
 - browser or exec workflows fail mid-run and the user gets no concise wrap-up
 - the agent finishes internal work but forgets to send the closing message
-- the outbound reply path fails after the task outcome is already known
+- the outbound reply path does not emit a reliable close signal for the active session
 - a task is left half-finished after crash, reboot, or process interruption
-
-This project is meant to detect and reduce exactly those cases.
-
-## Approach
-
-`openclaw-task-guard` uses three layers:
-
-1. **Hook-based task journal**
-   - Persist task lifecycle state to disk.
-   - Track inbound task start and outbound completion.
-
-2. **Watchdog / reconciler**
-   - Detect orphaned tasks where work happened but no final reply was sent.
-   - Recover cleanly after restarts or interrupted runs.
-
-3. **Closure behavior patterns**
-   - Encourage explicit, compact final updates after risky or multi-step work.
-
-Primary completion signal:
-
-- `message:sent`
-
-A task is not considered safely complete until an outbound user-visible final message has actually been sent.
 
 ## Current status
 
-Current repo state:
+This repository already contains a usable first operator-driven version:
 
-- architecture/design doc added
-- hook pack scaffold added
-- durable task state helper added
-- inbound/outbound hook skeleton added
-- reconciler and closure skill still in progress
+- workspace hook for durable inbound task journaling
+- startup + inbound reconciliation
+- task state transitions:
+  - `awaiting_reply`
+  - `awaiting_confirmation`
+  - `recovery_pending`
+  - `recovered`
+- recovery candidate generation
+- safe one-shot recovery policy with dedup protection
+- approval preview flow
+- approval confirm-and-close flow
+- real delivery bridge validated with Telegram via OpenClaw `message.send`
+- companion skill: `task-closure-guard`
+
+## Architecture
+
+The project uses three layers:
+
+1. **Hook-based task journal**
+   - Persist task lifecycle state to disk.
+   - Track inbound task start and refresh.
+
+2. **Reconciler / recovery pipeline**
+   - Detect stale open tasks.
+   - Move them through confirmation and recovery phases.
+   - Generate safe recovery candidates.
+
+3. **Closure behavior skill**
+   - Encourage compact final user-facing summaries after risky work.
+   - Reduce the number of orphaned tasks in the first place.
 
 ## Repository layout
 
 ```text
 .
 ├── docs/
+│   ├── operator-workflow.md
+│   ├── state-machine.md
 │   └── task-guard-plan.md
 ├── hooks/
 │   └── task-guard/
+│       ├── handler.ts
+│       ├── lib/
+│       └── scripts/
+├── skills/
+│   └── task-closure-guard/
 └── README.md
 ```
 
-## Next steps
+## Hook package overview
 
-- enable and validate the hook in OpenClaw
-- add startup reconciliation
-- add orphan detection heuristics
-- add a recovery policy
-- add a reusable closure skill
+### `hooks/task-guard/handler.ts`
+Main internal hook entrypoint.
+
+Listens to:
+- `message:preprocessed`
+- `message:sent`
+- `gateway:startup`
+
+Responsibilities:
+- open or refresh task state on inbound messages
+- reconcile stale tasks on startup and inbound turns
+- close tasks when a reliable outbound close event is available
+
+### `hooks/task-guard/lib/state.ts`
+Durable task state helpers.
+
+Responsibilities:
+- generate task ids
+- persist task files
+- persist open-session index
+- resolve workspace-local state directories
+
+### `hooks/task-guard/lib/reconcile.ts`
+State machine transition logic for stale open tasks.
+
+Responsibilities:
+- move `awaiting_reply` -> `awaiting_confirmation`
+- move `awaiting_confirmation` -> `recovery_pending`
+
+### `hooks/task-guard/lib/recovery*.ts`
+Recovery pipeline pieces.
+
+Responsibilities:
+- build recovery candidates
+- evaluate safe-send policy
+- create preview approvals
+- confirm approved recovery sends
+- close recovered tasks
+
+## Mini documentation
+
+See:
+- `docs/state-machine.md` — lifecycle states and transitions
+- `docs/operator-workflow.md` — practical operator workflow for preview / approve / confirm recovery sends
+- `docs/task-guard-plan.md` — architecture and implementation notes
+
+## Operator workflow
+
+High-level flow:
+
+1. task opens from inbound message
+2. reconciler marks stale task as `awaiting_confirmation`
+3. reconciler escalates to `recovery_pending`
+4. policy decides whether a recovery send is safe
+5. preview flow creates a pending approval
+6. operator confirms send
+7. recovery message is delivered
+8. task is marked `recovered` and closed
+
+## Scripts
+
+Representative scripts in `hooks/task-guard/scripts/`:
+
+- `reconcile.mjs` — run reconcile manually
+- `recovery-dry-run.mjs` — show recovery candidates
+- `recovery-policy-dry-run.mjs` — evaluate safe-send policy without sending
+- `recovery-preview.mjs` — create approval records for allowed recovery candidates
+- `recovery-confirm-send.mjs` — confirm an approval using an injected sender
+- `recovery-confirm-send-via-message.mjs` — bridge helper for operator-driven message-send workflows
+- `manual-recovery-send.mjs` — manual sender scaffold for controlled recovery testing
+
+## Notes on reliability
+
+- `message:sent` is treated as a **strong confirmation signal**, not the only closure signal.
+- Some OpenClaw reply paths may skip internal `message:sent` emission when no `sessionKeyForInternalHooks` is available.
+- For that reason, task recovery must not depend on one signal alone.
+
+## Companion skill
+
+`skills/task-closure-guard/` teaches the agent to always end risky work with a short closure block:
+
+- Done
+- Failed/blocked
+- Current status
+- Next step
+
+This lowers the number of dropped endings before recovery logic is even needed.
+
+## Current recommendation
+
+Use this project in **manual, approved recovery mode** first.
+
+That means:
+- detect stale tasks automatically
+- preview recovery candidates
+- require explicit approval before recovery delivery
+- avoid auto-send until confidence and guardrails are stronger

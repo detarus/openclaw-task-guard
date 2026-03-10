@@ -3,6 +3,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 export type TaskState = "open" | "closed" | "orphaned" | "error";
+
+// Phases describe the lifecycle stage inside an otherwise open/closed task record.
 export type TaskPhase =
   | "received"
   | "working"
@@ -37,6 +39,8 @@ export interface TaskRecord {
   tags?: string[];
 }
 
+// All durable state lives under the workspace so task history survives restarts
+// and is easy to inspect alongside the project.
 function resolveRoot(baseDir?: string) {
   const rootBase = baseDir || process.cwd();
   return path.join(rootBase, "state", "task-guard");
@@ -97,10 +101,13 @@ export async function loadTask(taskId: string, baseDir?: string): Promise<TaskRe
   }
 }
 
+// The index maps one active open task per session. This keeps lookup cheap while
+// leaving the full task history in per-task JSON files.
 export async function getOpenTaskForSession(sessionKey: string, baseDir?: string): Promise<TaskRecord | null> {
   const index = await loadIndex(baseDir);
   const taskId = index[sessionKey];
   if (!taskId) return null;
+
   const task = await loadTask(taskId, baseDir);
   if (!task) return null;
   if (task.state !== "open") return null;

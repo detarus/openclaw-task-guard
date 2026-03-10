@@ -8,6 +8,9 @@ import {
 } from "./lib/state.ts";
 import { reconcileOpenTasks } from "./lib/reconcile.ts";
 
+const DEFAULT_WORKSPACE_DIR = "/root/.openclaw/workspace";
+const DEFAULT_STALE_MS = 60_000;
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -25,22 +28,26 @@ function getInboundText(event: any): string {
   );
 }
 
+// Internal hook payloads are not fully uniform across reply paths, so this helper
+// centralizes the safest workspace resolution strategy used by the task journal.
 function getWorkspaceDir(event: any): string {
   return (
     event?.context?.workspaceDir ||
     event?.context?.sessionEntry?.workspaceDir ||
-    "/root/.openclaw/workspace"
+    DEFAULT_WORKSPACE_DIR
   );
 }
 
-async function runReconcile(workspaceDir: string, staleMs = 60_000) {
+async function runReconcile(workspaceDir: string, staleMs = DEFAULT_STALE_MS) {
   const result = await reconcileOpenTasks(workspaceDir, {
     dryRun: false,
     staleMs,
   });
+
   if (result.scanned || result.updated || result.candidates.length) {
     console.log(`[task-guard] reconcile ${JSON.stringify(result)}`);
   }
+
   return result;
 }
 
@@ -49,7 +56,11 @@ async function onInbound(event: any) {
   if (!sessionKey) return;
 
   const workspaceDir = getWorkspaceDir(event);
-  await runReconcile(workspaceDir, 60_000);
+
+  // Reconcile before refreshing the current session so stale tasks can advance
+  // into confirmation/recovery phases even when the next user turn is the trigger.
+  await runReconcile(workspaceDir);
+
   const existing = await getOpenTaskForSession(sessionKey, workspaceDir);
   const now = nowIso();
   const content = getInboundText(event);
@@ -61,7 +72,7 @@ async function onInbound(event: any) {
     existing.workDetected = true;
     existing.lastWorkAt = now;
     await saveTask(existing, workspaceDir);
-    console.log(`[task-guard] inbound refresh session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
+    console.log(`[task-guard] inbound refresh session=${sessionKey} workspace=${workspaceDir}`);
     return;
   }
 
@@ -77,7 +88,8 @@ async function onInbound(event: any) {
     state: "open",
     phase: "received",
     userText: content || undefined,
-    workDetected: false,
+    workDetected: true,
+    lastWorkAt: now,
     replySentAt: null,
     closedAt: null,
     recovery: {
@@ -89,15 +101,14 @@ async function onInbound(event: any) {
     tags: ["task-guard"],
   };
 
-  task.workDetected = true;
-  task.lastWorkAt = now;
   await saveTask(task, workspaceDir);
   await setOpenTaskForSession(sessionKey, task.taskId, workspaceDir);
-  console.log(`[task-guard] opened task=${task.taskId} session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
+  console.log(`[task-guard] opened task=${task.taskId} session=${sessionKey} workspace=${workspaceDir}`);
 }
 
 async function onOutbound(event: any) {
   if (event?.context?.success === false) return;
+
   const sessionKey = getSessionKey(event);
   if (!sessionKey) return;
 
@@ -113,12 +124,12 @@ async function onOutbound(event: any) {
   task.state = "closed";
   await saveTask(task, workspaceDir);
   await clearOpenTaskForSession(sessionKey, task.taskId, workspaceDir);
-  console.log(`[task-guard] closed task=${task.taskId} session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
+  console.log(`[task-guard] closed task=${task.taskId} session=${sessionKey} workspace=${workspaceDir}`);
 }
 
 async function onStartup(event: any) {
   const workspaceDir = getWorkspaceDir(event);
-  const result = await runReconcile(workspaceDir, 60_000);
+  const result = await runReconcile(workspaceDir);
   console.log(`[task-guard] startup reconcile ${JSON.stringify(result)}`);
 }
 

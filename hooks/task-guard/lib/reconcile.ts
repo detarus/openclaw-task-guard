@@ -1,6 +1,4 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { loadIndex, loadTask, saveTask, type TaskRecord } from "./state.ts";
+import { loadIndex, loadTask, saveTask } from "./state.ts";
 
 export type ReconcileResult = {
   scanned: number;
@@ -21,6 +19,8 @@ function ageMs(iso: string | undefined, now = Date.now()) {
   return now - ts;
 }
 
+// Reconcile only open tasks. Closed tasks keep their history but are not part of
+// the active state machine anymore.
 export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: number; dryRun?: boolean }) {
   const staleMs = opts?.staleMs ?? 60_000;
   const dryRun = opts?.dryRun ?? false;
@@ -34,6 +34,9 @@ export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: num
     result.scanned += 1;
 
     const taskAge = ageMs(task.updatedAt);
+
+    // The first stale transition means: work likely happened, but the final user
+    // update is still unconfirmed.
     if (task.phase === "awaiting_reply" && taskAge >= staleMs) {
       result.candidates.push({
         taskId,
@@ -42,6 +45,7 @@ export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: num
         toPhase: "awaiting_confirmation",
         reason: `stale-open-task>${staleMs}ms`,
       });
+
       if (!dryRun) {
         task.phase = "awaiting_confirmation";
         task.updatedAt = now;
@@ -56,6 +60,8 @@ export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: num
       continue;
     }
 
+    // The second stale transition means the task should be treated as a real
+    // recovery candidate rather than a merely suspicious open task.
     if (task.phase === "awaiting_confirmation" && taskAge >= staleMs * 3) {
       result.candidates.push({
         taskId,
@@ -64,6 +70,7 @@ export async function reconcileOpenTasks(baseDir: string, opts?: { staleMs?: num
         toPhase: "recovery_pending",
         reason: `awaiting-confirmation>${staleMs * 3}ms`,
       });
+
       if (!dryRun) {
         task.phase = "recovery_pending";
         task.updatedAt = now;

@@ -16,11 +16,13 @@ function isExpired(approval: PendingApproval) {
   return Number.isFinite(ts) ? Date.now() > ts : true;
 }
 
+// Confirm one previously previewed approval. This is the final human-in-the-loop
+// step before a recovery message is considered delivered and the task is closed.
 export async function confirmRecoverySend(
   baseDir: string,
   approvalId: string,
   sender: (params: { sessionKey: string; message: string }) => Promise<void>,
-) : Promise<ConfirmRecoveryResult> {
+): Promise<ConfirmRecoveryResult> {
   const approval = await loadApproval(baseDir, approvalId);
   if (!approval) {
     return { approvalId, status: "skipped", reason: "approval-not-found" };
