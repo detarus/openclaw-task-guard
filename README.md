@@ -119,6 +119,7 @@ See:
 - `docs/example-operator-session.md` — minimal end-to-end operator example
 - `docs/known-limitations.md` — current constraints and intentional guardrails
 - `docs/task-guard-plan.md` — architecture and implementation notes
+- `hooks/task-guard/docs/auto-startup-followup.md` — how startup incident follow-ups are prepared and where real auto-send wiring belongs
 
 ## Operator workflow
 
