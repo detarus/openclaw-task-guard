@@ -36,11 +36,22 @@ export interface TaskRecord {
   tags?: string[];
 }
 
-const ROOT = path.join(process.cwd(), "state", "task-guard");
-const TASKS_DIR = path.join(ROOT, "tasks");
-const INDEX_PATH = path.join(ROOT, "index.json");
+function resolveRoot(baseDir?: string) {
+  const rootBase = baseDir || process.cwd();
+  return path.join(rootBase, "state", "task-guard");
+}
 
-async function ensureLayout() {
+function getPaths(baseDir?: string) {
+  const root = resolveRoot(baseDir);
+  return {
+    ROOT: root,
+    TASKS_DIR: path.join(root, "tasks"),
+    INDEX_PATH: path.join(root, "index.json"),
+  };
+}
+
+async function ensureLayout(baseDir?: string) {
+  const { TASKS_DIR } = getPaths(baseDir);
   await fs.mkdir(TASKS_DIR, { recursive: true });
 }
 
@@ -50,8 +61,9 @@ export function makeTaskId(now = new Date()) {
   return `tg_${stamp}_${rand}`;
 }
 
-export async function loadIndex(): Promise<Record<string, string>> {
-  await ensureLayout();
+export async function loadIndex(baseDir?: string): Promise<Record<string, string>> {
+  await ensureLayout(baseDir);
+  const { INDEX_PATH } = getPaths(baseDir);
   try {
     const raw = await fs.readFile(INDEX_PATH, "utf8");
     return JSON.parse(raw);
@@ -60,19 +72,22 @@ export async function loadIndex(): Promise<Record<string, string>> {
   }
 }
 
-export async function saveIndex(index: Record<string, string>) {
-  await ensureLayout();
+export async function saveIndex(index: Record<string, string>, baseDir?: string) {
+  await ensureLayout(baseDir);
+  const { INDEX_PATH } = getPaths(baseDir);
   await fs.writeFile(INDEX_PATH, JSON.stringify(index, null, 2) + "\n", "utf8");
 }
 
-export async function saveTask(task: TaskRecord) {
-  await ensureLayout();
+export async function saveTask(task: TaskRecord, baseDir?: string) {
+  await ensureLayout(baseDir);
+  const { TASKS_DIR } = getPaths(baseDir);
   const file = path.join(TASKS_DIR, `${task.taskId}.json`);
   await fs.writeFile(file, JSON.stringify(task, null, 2) + "\n", "utf8");
 }
 
-export async function loadTask(taskId: string): Promise<TaskRecord | null> {
+export async function loadTask(taskId: string, baseDir?: string): Promise<TaskRecord | null> {
   try {
+    const { TASKS_DIR } = getPaths(baseDir);
     const file = path.join(TASKS_DIR, `${taskId}.json`);
     const raw = await fs.readFile(file, "utf8");
     return JSON.parse(raw) as TaskRecord;
@@ -81,26 +96,26 @@ export async function loadTask(taskId: string): Promise<TaskRecord | null> {
   }
 }
 
-export async function getOpenTaskForSession(sessionKey: string): Promise<TaskRecord | null> {
-  const index = await loadIndex();
+export async function getOpenTaskForSession(sessionKey: string, baseDir?: string): Promise<TaskRecord | null> {
+  const index = await loadIndex(baseDir);
   const taskId = index[sessionKey];
   if (!taskId) return null;
-  const task = await loadTask(taskId);
+  const task = await loadTask(taskId, baseDir);
   if (!task) return null;
   if (task.state !== "open") return null;
   return task;
 }
 
-export async function setOpenTaskForSession(sessionKey: string, taskId: string) {
-  const index = await loadIndex();
+export async function setOpenTaskForSession(sessionKey: string, taskId: string, baseDir?: string) {
+  const index = await loadIndex(baseDir);
   index[sessionKey] = taskId;
-  await saveIndex(index);
+  await saveIndex(index, baseDir);
 }
 
-export async function clearOpenTaskForSession(sessionKey: string, taskId?: string) {
-  const index = await loadIndex();
+export async function clearOpenTaskForSession(sessionKey: string, taskId?: string, baseDir?: string) {
+  const index = await loadIndex(baseDir);
   if (!index[sessionKey]) return;
   if (taskId && index[sessionKey] !== taskId) return;
   delete index[sessionKey];
-  await saveIndex(index);
+  await saveIndex(index, baseDir);
 }

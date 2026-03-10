@@ -24,11 +24,16 @@ function getInboundText(event: any): string {
   );
 }
 
+function getWorkspaceDir(event: any): string | undefined {
+  return event?.context?.workspaceDir || event?.context?.sessionEntry?.workspaceDir;
+}
+
 async function onInbound(event: any) {
   const sessionKey = getSessionKey(event);
   if (!sessionKey) return;
 
-  const existing = await getOpenTaskForSession(sessionKey);
+  const workspaceDir = getWorkspaceDir(event);
+  const existing = await getOpenTaskForSession(sessionKey, workspaceDir);
   const now = nowIso();
   const content = getInboundText(event);
 
@@ -36,7 +41,10 @@ async function onInbound(event: any) {
     existing.updatedAt = now;
     existing.phase = existing.workDetected ? "awaiting_reply" : "received";
     if (content) existing.userText = content;
-    await saveTask(existing);
+    existing.workDetected = true;
+    existing.lastWorkAt = now;
+    await saveTask(existing, workspaceDir);
+    console.log(`[task-guard] inbound refresh session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
     return;
   }
 
@@ -64,8 +72,11 @@ async function onInbound(event: any) {
     tags: ["task-guard"],
   };
 
-  await saveTask(task);
-  await setOpenTaskForSession(sessionKey, task.taskId);
+  task.workDetected = true;
+  task.lastWorkAt = now;
+  await saveTask(task, workspaceDir);
+  await setOpenTaskForSession(sessionKey, task.taskId, workspaceDir);
+  console.log(`[task-guard] opened task=${task.taskId} session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
 }
 
 async function onOutbound(event: any) {
@@ -73,7 +84,8 @@ async function onOutbound(event: any) {
   const sessionKey = getSessionKey(event);
   if (!sessionKey) return;
 
-  const task = await getOpenTaskForSession(sessionKey);
+  const workspaceDir = getWorkspaceDir(event);
+  const task = await getOpenTaskForSession(sessionKey, workspaceDir);
   if (!task) return;
 
   const now = nowIso();
@@ -82,8 +94,9 @@ async function onOutbound(event: any) {
   task.closedAt = now;
   task.phase = "reply_sent";
   task.state = "closed";
-  await saveTask(task);
-  await clearOpenTaskForSession(sessionKey, task.taskId);
+  await saveTask(task, workspaceDir);
+  await clearOpenTaskForSession(sessionKey, task.taskId, workspaceDir);
+  console.log(`[task-guard] closed task=${task.taskId} session=${sessionKey} workspace=${workspaceDir || process.cwd()}`);
 }
 
 async function onStartup(_event: any) {
