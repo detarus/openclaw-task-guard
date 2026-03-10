@@ -33,11 +33,23 @@ function getWorkspaceDir(event: any): string {
   );
 }
 
+async function runReconcile(workspaceDir: string, staleMs = 60_000) {
+  const result = await reconcileOpenTasks(workspaceDir, {
+    dryRun: false,
+    staleMs,
+  });
+  if (result.scanned || result.updated || result.candidates.length) {
+    console.log(`[task-guard] reconcile ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 async function onInbound(event: any) {
   const sessionKey = getSessionKey(event);
   if (!sessionKey) return;
 
   const workspaceDir = getWorkspaceDir(event);
+  await runReconcile(workspaceDir, 60_000);
   const existing = await getOpenTaskForSession(sessionKey, workspaceDir);
   const now = nowIso();
   const content = getInboundText(event);
@@ -106,10 +118,7 @@ async function onOutbound(event: any) {
 
 async function onStartup(event: any) {
   const workspaceDir = getWorkspaceDir(event);
-  const result = await reconcileOpenTasks(workspaceDir, {
-    dryRun: false,
-    staleMs: 60_000,
-  });
+  const result = await runReconcile(workspaceDir, 60_000);
   console.log(`[task-guard] startup reconcile ${JSON.stringify(result)}`);
 }
 
