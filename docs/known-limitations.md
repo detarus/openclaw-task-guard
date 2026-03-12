@@ -1,36 +1,24 @@
 # Known Limitations
 
-## 1. `message:sent` is not always available
+## 1. Restart recovery is currently the strongest recovery path
+
+The most reliable automatic recovery path implemented today is the direct restart-recovery path for `gateway restart`.
+
+More general interrupted-task continuation is not fully solved yet.
+
+## 2. `message:sent` is not always available
 
 Some OpenClaw reply paths may skip the internal `message:sent` hook when no reliable `sessionKeyForInternalHooks` is available.
 
 Implication:
 - outbound closure cannot rely on one signal alone
-- reconcile + approval recovery remains necessary
+- reconcile + recovery state still matters
 
-## 2. Current recovery summaries are simple
+## 3. General execution continuation is not done
 
-Recovery text is currently built from:
-- stored task summary, or
-- last known user context, or
-- current task phase
+The system can recover communication/status for restart cases, but it does not yet fully resume arbitrary interrupted execution flows.
 
-Implication:
-- recovery messages are intentionally compact, but not yet deeply semantic
+## 4. Recovery summaries are intentionally compact
 
-## 3. Manual recovery mode is the recommended default
-
-The current implementation is strongest in:
-- detection
-- classification
-- approval-based recovery
-
-Automatic recovery delivery is intentionally not enabled by default.
-
-## 4. Workspace state contains operational history
-
-`state/task-guard/` is designed for inspection and durability.
-
-Implication:
-- test/demo runs should be cleaned up periodically
-- state files are part of the operator workflow, not disposable temp files
+Recovery text is currently short and factual.
+It is optimized for safe recovery messaging, not for rich semantic reconstruction of every interrupted task.

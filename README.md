@@ -32,7 +32,7 @@ This repository already contains a usable first operator-driven version:
 - approval preview flow
 - approval confirm-and-close flow
 - real delivery bridge validated with Telegram via OpenClaw `message.send`
-- incident-based startup follow-up preparation for known restart interruption scenarios
+- direct restart-recovery path for `gateway restart` with post-start auto-send
 - companion skill: `task-closure-guard`
 
 ## Architecture
@@ -118,6 +118,7 @@ See:
 - `docs/operator-workflow.md` — practical operator workflow for preview / approve / confirm recovery sends
 - `docs/example-operator-session.md` — minimal end-to-end operator example
 - `docs/known-limitations.md` — current constraints and intentional guardrails
+- `docs/restart-recovery.md` — canonical restart-recovery path and guarantees
 - `docs/task-guard-plan.md` — architecture and implementation notes
 - `hooks/task-guard/docs/auto-startup-followup.md` — how startup incident follow-ups are prepared and where real auto-send wiring belongs
 
