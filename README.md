@@ -183,3 +183,20 @@ Before testing in a live chat:
 - verify `state/task-guard/` is writable in the workspace
 - trigger a normal inbound message and confirm a task file is created
 - simulate a stale/recovery case before trying a real approved recovery send
+
+## Versioning
+
+This repository uses `x.y.z.n` versioning.
+
+- `x` changes only on releases
+- `y` and `z` are reserved for future structured milestones
+- `n` auto-increments on every commit through the repository pre-commit hook
+
+Current version is stored in `VERSION`.
+
+## Branch model
+
+- `main` — stable/release-oriented branch
+- `dev` — integration branch for not-yet-verified work
+- `task-continuation` — focused branch for the next major feature: interrupted task continuation after restart
+
