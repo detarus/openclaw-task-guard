@@ -18,16 +18,21 @@ This is more reliable than trying to push a user-visible send directly out of a 
 
 ## Suggested post-start wrapper
 
-A lightweight post-start script can do only this:
+A lightweight post-start script should:
 
 ```bash
-openclaw system event --text "Process startup auto-followups from task-guard approvals and continue any safe known restart recovery." --mode now
+# 1. wait until gateway status is healthy
+# 2. wait until startup approvals exist (if any)
+# 3. run send-startup-auto-approvals.mjs
 ```
 
-## Heartbeat responsibility
+This avoids racing the gateway startup sequence or firing before `task-guard` has created the approval.
 
-The heartbeat should:
-- look for startup auto-followup approvals
+## Post-start responsibility
+
+The post-start bridge should:
+- wait for gateway readiness
+- wait for startup auto-followup approvals
 - run `send-startup-auto-approvals.mjs`
 - avoid duplicate sends
 - only add an extra continuation message if the recovery send alone is not enough
