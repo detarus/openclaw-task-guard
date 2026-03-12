@@ -1,50 +1,33 @@
 # Auto Startup Follow-up
 
-## What already works
+## Recommended runtime wiring
 
-On `gateway:startup`, `task-guard` can already:
-- detect pending known incidents
-- reconcile current task state
-- create a one-shot approval with a safe resume-status message
+Use a two-step startup path:
 
-For `gateway-restart-interrupt`, the approval text now includes:
-- interruption acknowledgement
-- current verified status
-- continuation cue
+1. `task-guard` startup hook prepares safe startup approvals for known incidents
+2. a post-start system event triggers a normal OpenClaw heartbeat/agent turn
+3. the heartbeat checks for startup auto-followup approvals and sends them through the trusted runtime path
 
-Example:
+This is more reliable than trying to push a user-visible send directly out of a thin systemd tail.
 
-> Похоже, прошлый шаг мог оборваться на рестарте. Перепроверил: gateway уже поднялся, task-guard снова загрузился, startup reconcile отработал. Продолжаю с текущего места.
+## Why this is better
 
-## Why auto-send is not fully inside the hook yet
+- the startup hook keeps durable state and approvals inside the workspace
+- the heartbeat turn runs inside the normal OpenClaw runtime/tool environment
+- sending happens through the same trusted agent path used for normal message delivery
 
-The workspace hook runtime can prepare durable state and approvals, but it does not directly own the same safe operator messaging surface as the outer OpenClaw agent/tool environment.
+## Suggested post-start wrapper
 
-In practice, this means:
-- startup hook can prepare a safe approval automatically
-- a send bridge still needs to deliver it through a trusted path such as OpenClaw `message.send`
+A lightweight post-start script can do only this:
 
-## Recommended wiring
+```bash
+openclaw system event --text "Process startup auto-followups from task-guard approvals and continue any safe known restart recovery." --mode now
+```
 
-Use this two-part chain:
+## Heartbeat responsibility
 
-1. `task-guard` startup hook creates a safe startup approval
-2. a local operator bridge picks up eligible approvals and sends them through OpenClaw messaging
-
-## Intended bridge behavior
-
-Only auto-send when all are true:
-- approval is `pending`
-- approval came from a known safe startup incident
-- one-shot limit not exceeded
-- target session/channel is explicitly allowlisted
-
-## Current repository support
-
-Current repo already contains:
-- incident journal
-- startup incident -> approval conversion
-- startup auto-send eligibility helper
-- real message bridge validation through Telegram
-
-The remaining step is environment-specific wiring between the eligible startup approval and the trusted send surface.
+The heartbeat should:
+- look for startup auto-followup approvals
+- run `send-startup-auto-approvals.mjs`
+- avoid duplicate sends
+- only add an extra continuation message if the recovery send alone is not enough
