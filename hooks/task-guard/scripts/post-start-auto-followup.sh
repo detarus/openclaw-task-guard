@@ -1,30 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 BASE_DIR="/root/.openclaw/workspace"
-SEND_SCRIPT="$BASE_DIR/hooks/task-guard/scripts/send-startup-auto-approvals.mjs"
-APPROVAL_DIR="$BASE_DIR/state/task-guard/approvals"
 LOG_TAG="[task-guard post-start]"
 
-# Wait until gateway is actually up.
-for _ in $(seq 1 20); do
+for _ in $(seq 1 30); do
   if openclaw gateway status >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-# Wait until startup hooks have had time to create approvals.
-for _ in $(seq 1 20); do
-  if find "$APPROVAL_DIR" -maxdepth 1 -type f -name '*.json' 2>/dev/null | grep -q .; then
-    break
-  fi
-  sleep 1
-done
-
-if [ ! -f "$SEND_SCRIPT" ]; then
-  echo "$LOG_TAG sender bridge script missing: $SEND_SCRIPT"
-  exit 0
-fi
-
-node "$SEND_SCRIPT" "$BASE_DIR" || true
+node - <<'NODE'
+import { listRestartRecoveries, markRestartRecoverySent } from '/root/.openclaw/workspace/hooks/task-guard/lib/restart-recovery.ts';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
+const baseDir = '/root/.openclaw/workspace';
+const rows = await listRestartRecoveries(baseDir);
+const pending = rows.filter(r => r.status === 'pending');
+const results = [];
+for (const row of pending) {
+  await execFileAsync('openclaw', ['message', 'send', '--channel', row.channel, '--target', row.target, '--message', row.message]);
+  await markRestartRecoverySent(baseDir, row.recoveryId);
+  results.push({ recoveryId: row.recoveryId, status: 'sent', channel: row.channel, target: row.target });
+}
+console.log(JSON.stringify({ restartRecoveries: pending.length, results }, null, 2));
+NODE
