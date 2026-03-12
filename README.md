@@ -145,6 +145,7 @@ Representative scripts in `hooks/task-guard/scripts/`:
 - `recovery-confirm-send.mjs` — confirm an approval using an injected sender
 - `recovery-confirm-send-via-message.mjs` — bridge helper for operator-driven message-send workflows
 - `manual-recovery-send.mjs` — manual sender scaffold for controlled recovery testing
+- `guarded-gateway-restart.mjs` — create a restart incident marker before a gateway restart so startup follow-up can recover cleanly
 
 ## Notes on reliability
 

@@ -31,6 +31,17 @@ Example:
 
 ## Workflow
 
+### 0. For planned risky restarts, create an incident marker first
+
+For a gateway restart that may interrupt the current run:
+
+```bash
+node hooks/task-guard/scripts/guarded-gateway-restart.mjs /root/.openclaw/workspace agent:main:telegram:direct:759328425
+openclaw gateway restart
+```
+
+This ensures startup follow-up logic can recover the interruption with a known safe resume-status message.
+
 ### 1. Reconcile stale tasks
 
 Run the reconcile script to move open stale tasks forward:
